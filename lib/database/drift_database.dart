@@ -18,7 +18,7 @@ part 'drift_database.g.dart'; // part 파일 지정
 
 // class LocalDatabase extends _$LocalDatabase {}
 // 여기까지 작성하고 터미널 -> flutter pub run build_runner build 명령어 실행
-// Colde Generation으로 생성할 클래스 상속
+// Colde Generation로 생성할 클래스 상속
 
 class LocalDatabase extends _$LocalDatabase {
   LocalDatabase() : super(_openConnection()); //LazyDatabase 객체 입력 받기
@@ -48,8 +48,10 @@ class LocalDatabase extends _$LocalDatabase {
 }
 
 // LazyDatabase 반환 함수
+// 드리프트 데이터베이스 객체는 부모 생성자에 필수로 LazyDatabase를 넣어줘야 한다.
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
+    // 데이터베이스 파일 저장할 폴더
     final dbFolder = await getApplicationDocumentsDirectory();
     final file = File(p.join(dbFolder.path, 'db.sqlite'));
     return NativeDatabase(file);

@@ -108,13 +108,14 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
       // print(startTime);
       // print(endTime);
       // print(content);
-      await GetIt.I<LocalDatabase>().createSchedule(//일정 생성
+      int result = await GetIt.I<LocalDatabase>().createSchedule(//일정 생성
           SchedulesCompanion(
         startTime: Value(startTime!),
         endTime: Value(endTime!),
         content: Value(content!),
         date: Value(widget.selectedDate),
       ));
+      print('result : ${result}');
       Navigator.of(context).pop(); // 일정 생성 후 화면 뒤로가기
     }
   }

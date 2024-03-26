@@ -202,7 +202,6 @@ class Schedule extends DataClass implements Insertable<Schedule> {
           other.endTime == this.endTime);
 }
 
-// 레코드의 업데이트를 도와주는 클래스
 class SchedulesCompanion extends UpdateCompanion<Schedule> {
   final Value<int> id;
   final Value<String> content;
@@ -216,7 +215,6 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
   });
-  // 새로운 데이터베이스 레코드를 삽입할 때 사용되는 생성자
   SchedulesCompanion.insert({
     this.id = const Value.absent(),
     required String content,
@@ -292,8 +290,6 @@ class SchedulesCompanion extends UpdateCompanion<Schedule> {
   }
 }
 
-// 데이터베이스와의 연결을 설정하고
-// 테이블에 대한 쿼리를 수행할 수 있는 인터페이스를 제공
 abstract class _$LocalDatabase extends GeneratedDatabase {
   _$LocalDatabase(QueryExecutor e) : super(e);
   late final $SchedulesTable schedules = $SchedulesTable(this);
