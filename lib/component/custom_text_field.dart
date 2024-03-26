@@ -4,13 +4,21 @@ import 'package:flutter/services.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label; // 텍스트 필드 제목
-  final bool isTime;
+  final bool isTime; // 시간 선택하는 텍스트 필드인지 여부
+  final FormFieldSetter<String> onSaved;
+  final FormFieldValidator<String> validator;
 
-  const CustomTextField({super.key, required this.label, required this.isTime});
+  const CustomTextField(
+      {super.key,
+      required this.label,
+      required this.isTime,
+      required this.onSaved,
+      required this.validator});
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      // 세로로 텍스트와 텍스트 필드를 위치
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -23,6 +31,8 @@ class CustomTextField extends StatelessWidget {
         Expanded(
           flex: isTime ? 0 : 1,
           child: TextFormField(
+            onSaved: onSaved, // 폼 저장했을 때 실행할 함수
+            validator: validator, // 폼 검증헀을 때 실행할 함수
             cursorColor: Colors.grey,
             maxLines: isTime ? 1 : null, // 시간 관련 텍스트 필드가 아니면 한 줄 이상 작성 가능
             expands: !isTime, // 시간 관련 텍스트 필드는 공간 최대 차지
@@ -36,11 +46,10 @@ class CustomTextField extends StatelessWidget {
               border: InputBorder.none, // 테두리 삭제
               filled: true, //배경색을 지정하겠다 선언
               fillColor: Colors.grey[300], // 배경색
-              suffixText: isTime ? '시' : null,
+              suffixText: isTime ? '시' : null, // 시간 관련 텍스트 필드는 '시' 접미사 추가
             ),
           ),
         ),
-        TextFormField(),
       ],
     );
   }
