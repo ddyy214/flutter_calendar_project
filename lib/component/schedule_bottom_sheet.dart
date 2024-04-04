@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:calendar_scheduler/component/custom_text_field.dart';
 import 'package:calendar_scheduler/const/colors.dart';
 import 'package:get_it/get_it.dart';
+import 'package:path/path.dart';
 import '../database/drift_database.dart';
 import 'package:drift/drift.dart' hide Column;
+import 'package:calendar_scheduler/model/schedule_model.dart';
+import 'package:provider/provider.dart';
+import 'package:calendar_scheduler/provider/schedule_provider.dart';
 
 class ScheduleBottomSheet extends StatefulWidget {
   final DateTime selectedDate; // 선택된 날짜 상위 위젯에서 입력받기(홈 위젯)
@@ -85,7 +89,7 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
                   width: double.infinity,
                   child: ElevatedButton(
                     // 저장버튼
-                    onPressed: onSavePressed,
+                    onPressed: () => onSavePressed(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: PRIMARY_COLOR,
                     ),
@@ -100,7 +104,7 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
     );
   }
 
-  void onSavePressed() async {
+  void onSavePressed(BuildContext context) async {
     if (formKey.currentState!.validate()) {
       // 폼 검증하기
       formKey.currentState!.save(); // 폼 저장하기
@@ -108,14 +112,15 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
       // print(startTime);
       // print(endTime);
       // print(content);
-      int result = await GetIt.I<LocalDatabase>().createSchedule(//일정 생성
-          SchedulesCompanion(
-        startTime: Value(startTime!),
-        endTime: Value(endTime!),
-        content: Value(content!),
-        date: Value(widget.selectedDate),
-      ));
-      print('result : ${result}');
+      context.read<ScheduleProvider>().createSchedule(
+            schedule: ScheduleModel(
+              id: 'new_model',
+              content: content!,
+              date: widget.selectedDate,
+              startTime: startTime!,
+              endTime: endTime!,
+            ),
+          );
       Navigator.of(context).pop(); // 일정 생성 후 화면 뒤로가기
     }
   }
