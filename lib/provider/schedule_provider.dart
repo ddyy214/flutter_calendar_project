@@ -2,7 +2,7 @@ import 'package:calendar_scheduler/model/schedule_model.dart';
 import 'package:calendar_scheduler/repository/schedule_repository.dart';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 class ScheduleProvider extends ChangeNotifier {
   final ScheduleRepository repository; // API 요청 로직을 담은 클래스
@@ -34,6 +34,11 @@ class ScheduleProvider extends ChangeNotifier {
     required ScheduleModel schedule,
   }) async {
     final targetDate = schedule.date;
+    final uuid = Uuid();
+    final tempId = uuid.v4();
+    final newSchedule = schedule.copyWith(
+      id: tempId,
+    );
 
     final savedSchedule = await repository.createSchedule(schedule: schedule);
 
@@ -41,14 +46,35 @@ class ScheduleProvider extends ChangeNotifier {
       targetDate,
       (value) => [
         ...value,
-        schedule.copyWith(
-          id: savedSchedule,
-        ),
+        newSchedule,
       ]..sort(
-          (a, b) => a.startTime.compareTo(b.startTime),
+          (a, b) => a.startTime.compareTo(
+            b.startTime,
+          ),
         ),
-      ifAbsent: () => [schedule],
+      ifAbsent: () => [newSchedule],
     );
+    notifyListeners(); // 캐시 업데이트 반영하기
+
+    try {
+      // API 요청하기
+      final savedSchedule = await repository.createSchedule(schedule: schedule);
+      cache.update(
+        targetDate,
+        (value) => value
+            .map((e) => e.id == tempId
+                ? e.copyWith(
+                    id: savedSchedule,
+                  )
+                : e)
+            .toList(),
+      );
+    } catch (e) {
+      cache.update(
+        targetDate,
+        (value) => value.where((e) => e.id != tempId).toList(),
+      );
+    }
     notifyListeners();
   }
 
@@ -56,13 +82,28 @@ class ScheduleProvider extends ChangeNotifier {
     required DateTime date,
     required String id,
   }) async {
-    final resp = await repository.deleteSchedule(id: id);
-
+    final targetSchedule = cache[date]!.firstWhere(
+      (e) => e.id == id,
+    ); // 삭제할 일정 기억
     cache.update(
       date,
       (value) => value.where((e) => e.id != id).toList(),
       ifAbsent: () => [],
     );
+    notifyListeners();
+
+    try {
+      await repository.deleteSchedule(id: id);
+    } catch (e) {
+      cache.update(
+        date,
+        (value) => [...value, targetSchedule]..sort(
+            (a, b) => a.startTime.compareTo(
+              b.startTime,
+            ),
+          ),
+      );
+    }
     notifyListeners();
   }
 
