@@ -1,92 +1,151 @@
+import 'package:calendar_scheduler/model/schedule_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:calendar_scheduler/component/main_calendar.dart';
-import 'package:calendar_scheduler/component/schedule_bottom_sheet.dart';
 import 'package:calendar_scheduler/component/schedule_card.dart';
 import 'package:calendar_scheduler/component/today_banner.dart';
+import 'package:calendar_scheduler/component/schedule_bottom_sheet.dart';
 import 'package:calendar_scheduler/const/colors.dart';
-import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 
-import 'package:provider/provider.dart';
-import 'package:calendar_scheduler/provider/schedule_provider.dart';
+class HomeScreen extends StatefulWidget {
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-class HomeScreen extends StatelessWidget {
+class _HomeScreenState extends State<HomeScreen> {
+  DateTime selectedDate = DateTime.utc(
+    // ➋ 선택된 날짜를 관리할 변수
+    DateTime.now().year,
+    DateTime.now().month,
+    DateTime.now().day,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final provider =
-        context.watch<ScheduleProvider>(); //  프로바이더 변경이 있을 때마다 build() 함수 재실행
-    final selectedDate = provider.selectedDate; // 선택된 날짜 가져오기
-    final schedules =
-        provider.cache[selectedDate] ?? []; // 선택된 날짜에 해당되는 일정들 가져오기
-
     return Scaffold(
       floatingActionButton: FloatingActionButton(
+        // ➊ 새 일정 버튼
         backgroundColor: PRIMARY_COLOR,
         onPressed: () {
-          // BottomSheet 열기
           showModalBottomSheet(
+            // ➋ BottomSheet 열기
             context: context,
+            isDismissible: true, // ➌ 배경 탭했을 때 BottomSheet 닫기
             isScrollControlled: true,
-            isDismissible: true, // 배경 탭했을 때 BottomSheet 닫기
             builder: (_) => ScheduleBottomSheet(
-              selectedDate: selectedDate, // 선택된 날짜 넘겨주기
+              selectedDate: selectedDate, // 선택된 날짜 (selectedDate) 넘겨주기
             ),
           );
         },
-        child: const Icon(
+        child: Icon(
           Icons.add,
         ),
       ),
       body: SafeArea(
+        // 시스템 UI 피해서 UI 구현하기
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          // 달력과 리스트를 세로로 배치
           children: [
-            SizedBox(
-              height: 400,
-              // 매인 캘린더
-              child: MainCalendar(
-                selectedDate: selectedDate, // 선택된 날짜 전달하기
-                onDaySelected: (selectedDate, focusedDate) => onDaySelected(
-                    selectedDate, focusedDate, context), // 날짜가 선택됐을 때 실행할 함수
-              ),
+            MainCalendar(
+              selectedDate: selectedDate, // 선택된 날짜 전달하기
+
+              // 날짜가 선택됐을 때 실행할 함수
+              onDaySelected: (selectedDate, focusedDate) =>
+                  onDaySelected(selectedDate, focusedDate, context),
             ),
-            SizedBox(
-              height: 8.0,
+            SizedBox(height: 8.0),
+            // Firestore에서 'schedule' 컬렉션의 데이터를 스트림으로 가져오기
+            StreamBuilder<QuerySnapshot>(
+              // ListView에 적용했던 같은 쿼리
+              stream: FirebaseFirestore.instance
+                  .collection(
+                    'schedule',
+                  )
+                  .where(
+                    'date',
+                    isEqualTo:
+                        '${selectedDate.year}${selectedDate.month.toString().padLeft(2, '0')}${selectedDate.day.toString().padLeft(2, '0')}',
+                  )
+                  .snapshots(),
+              builder: (context, snapshot) {
+                return TodayBanner(
+                  selectedDate: selectedDate,
+
+                  // ➊ 개수 가져오기
+                  count: snapshot.data?.docs.length ?? 0,
+                );
+              },
             ),
-            TodayBanner(
-              selectedDate: selectedDate,
-              count: schedules.length,
-            ),
-            SizedBox(
-              height: 8.0,
-            ),
+            SizedBox(height: 8.0),
             Expanded(
-              child: ListView.builder(
-                itemCount: schedules.length,
-                itemBuilder: (context, index) {
-                  final schedule = schedules[index];
+              child: StreamBuilder<QuerySnapshot>(
+                // ➊ 파이어스토어로부터 일정 정보 받아오기
+                stream: FirebaseFirestore.instance
+                    .collection(
+                      'schedule',
+                    )
+                    .where(
+                      'date',
+                      isEqualTo:
+                          '${selectedDate.year}${selectedDate.month.toString().padLeft(2, '0')}${selectedDate.day.toString().padLeft(2, '0')}',
+                    )
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  // Stream을 가져오는 동안 에러가 났을 때 보여줄 화면
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('일정 정보를 가져오지 못했습니다.'),
+                    );
+                  }
 
-                  return Dismissible(
-                    // 밀어서 삭제하는 제스처
-                    key: ObjectKey(schedule.id), // 유니크한 키값
-                    direction: DismissDirection.startToEnd, // 밀기 방향-> 왼쪽에서 오른쪽
-                    onDismissed: (DismissDirection direction) {
-                      // GetIt.I<LocalDatabase>().removeSchedule(schedule.id);
-                      provider.deleteSchedule(
-                          date: selectedDate, id: schedule.id);
+                  // 로딩 중일 때 보여줄 화면
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return Container();
+                  }
+
+                  // ➋ ScheduleModel로 데이터 매핑하기
+                  final schedules = snapshot.data!.docs
+                      .map(
+                        (QueryDocumentSnapshot e) => ScheduleModel.fromJson(
+                            json: (e.data() as Map<String, dynamic>)),
+                      )
+                      .toList();
+
+                  return ListView.builder(
+                    itemCount: schedules.length,
+                    itemBuilder: (context, index) {
+                      final schedule = schedules[index];
+
+                      return Dismissible(
+                        key: ObjectKey(schedule.id),
+                        direction: DismissDirection.startToEnd,
+                        onDismissed: (DismissDirection direction) {
+                          FirebaseFirestore.instance
+                              .collection('schedule')
+                              .doc(schedule.id)
+                              .delete();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(
+                              bottom: 8.0, left: 8.0, right: 8.0),
+                          child: ScheduleCard(
+                            startTime: schedule.startTime,
+                            endTime: schedule.endTime,
+                            content: schedule.content,
+                          ),
+                        ),
+                      );
                     },
-
-                    child: Padding(
-                      padding: const EdgeInsets.only(
-                          bottom: 8.0, left: 8.0, right: 8.0),
-                      child: ScheduleCard(
-                        startTime: schedule.startTime,
-                        endTime: schedule.endTime,
-                        content: schedule.content,
-                      ),
-                    ),
                   );
                 },
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -98,10 +157,8 @@ class HomeScreen extends StatelessWidget {
     DateTime focusedDate,
     BuildContext context,
   ) {
-    final provider = context.read<ScheduleProvider>();
-    provider.changeSelectedDate(
-      date: selectedDate,
-    );
-    provider.getSchedules(date: selectedDate);
+    setState(() {
+      this.selectedDate = selectedDate;
+    });
   }
 }

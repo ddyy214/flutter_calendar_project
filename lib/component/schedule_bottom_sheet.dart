@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:calendar_scheduler/component/custom_text_field.dart';
 import 'package:calendar_scheduler/const/colors.dart';
-import 'package:get_it/get_it.dart';
-import 'package:path/path.dart';
-import '../database/drift_database.dart';
-import 'package:drift/drift.dart' hide Column;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:calendar_scheduler/model/schedule_model.dart';
-import 'package:provider/provider.dart';
-import 'package:calendar_scheduler/provider/schedule_provider.dart';
+import 'package:logger/logger.dart';
+import 'package:uuid/uuid.dart';
+//import 'package:provider/provider.dart';
+//import 'package:calendar_scheduler/provider/schedule_provider.dart';
 
 class ScheduleBottomSheet extends StatefulWidget {
   final DateTime selectedDate; // 선택된 날짜 상위 위젯에서 입력받기(홈 위젯)
@@ -66,7 +65,7 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
                         label: '종료 시간', // 종료시간 입력 필드
                         isTime: true,
                         onSaved: (String? val) {
-                          // 저장이 실행되면 endTime 변수에 텍스트 필드갑 저장
+                          // 저장이 실행되면 endTime 변수에 텍스트 필드값 저장
                           endTime = int.parse(val!);
                         },
                         validator: timeValidator,
@@ -109,18 +108,23 @@ class _ScheduleBottomSheetState extends State<ScheduleBottomSheet> {
       // 폼 검증하기
       formKey.currentState!.save(); // 폼 저장하기
 
-      // print(startTime);
-      // print(endTime);
-      // print(content);
-      context.read<ScheduleProvider>().createSchedule(
-            schedule: ScheduleModel(
-              id: 'new_model',
-              content: content!,
-              date: widget.selectedDate,
-              startTime: startTime!,
-              endTime: endTime!,
-            ),
-          );
+      // 스케줄 모델 생성하기
+      final schedule = ScheduleModel(
+        id: Uuid().v4(),
+        content: content!,
+        date: widget.selectedDate,
+        startTime: startTime!,
+        endTime: endTime!,
+      );
+
+      // 스케줄 모델 파이어스토어에 삽입하기
+      await FirebaseFirestore.instance
+          .collection(
+            'schedule',
+          )
+          .doc(schedule.id)
+          .set(schedule.toJson());
+
       Navigator.of(context).pop(); // 일정 생성 후 화면 뒤로가기
     }
   }
